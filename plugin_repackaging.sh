@@ -112,10 +112,26 @@ repackage(){
 	cd ${CURR_DIR}/${PACKAGE_NAME}
 	sanitize_pyproject_for_runtime
 	mkdir -p ./wheels
-	download_setuptools
-	pip download ${PIP_PLATFORM} -r requirements.txt -d ./wheels --index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com --only-binary=:all:
+
+	# 确保已安装 uv
+	if ! command -v uv &> /dev/null; then
+		echo "Installing uv..."
+		curl -LsSf https://astral.sh/uv/install.sh | sh
+		export PATH="$HOME/.local/bin:$PATH"
+	fi
+
+	# 使用 uv 从 pyproject.toml 下载依赖
+	echo "Downloading dependencies from pyproject.toml..."
+	uv pip download ${PIP_PLATFORM} -p pyproject.toml -d ./wheels \
+		--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com \
+		--only-binary=:all:
+
 	if [[ $? -ne 0 ]]; then
-		echo "Pip download failed."
+		echo "Failed to download dependencies from pyproject.toml."
+		echo "Possible causes:"
+		echo "  - No compatible binary wheels found for platform: ${PIP_PLATFORM}"
+		echo "  - Dependency constraints in pyproject.toml cannot be satisfied"
+		echo "  - Network issue or mirror unreachable: ${PIP_MIRROR_URL}"
 		exit 1
 	fi
 	build_wheels_from_sdists
@@ -163,15 +179,6 @@ install_unzip(){
 			exit 1
 		fi
 	fi
-}
-
-download_setuptools(){
-    echo "Downloading setuptools..."
-	pip download ${PIP_PLATFORM} "setuptools>=40.8.0" -d ./wheels --index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com --only-binary=:all:
-    if [[ $? -ne 0 ]]; then
-        echo "Download setuptools failed."
-        exit 1
-    fi
 }
 
 sanitize_pyproject_for_runtime(){
