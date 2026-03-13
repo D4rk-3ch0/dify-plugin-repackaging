@@ -133,17 +133,18 @@ repackage(){
 	fi
 
 	# 使用 pip 下载依赖
+	# 注意：不使用 --only-binary=:all:，因为某些包可能没有对应平台的 wheel
+	# 需要从源码构建，build_wheels_from_sdists 会处理
 	echo "Downloading dependencies..."
 	pip download ${PIP_PLATFORM} -r requirements.txt -d ./wheels \
-		--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com \
-		--only-binary=:all:
+		--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
 
 	if [[ $? -ne 0 ]]; then
 		echo "Failed to download dependencies."
 		echo "Possible causes:"
-		echo "  - No compatible binary wheels found for platform: ${PIP_PLATFORM}"
 		echo "  - Dependency constraints in requirements.txt cannot be satisfied"
 		echo "  - Network issue or mirror unreachable: ${PIP_MIRROR_URL}"
+		echo "  - Try using official PyPI if mirror is outdated: https://pypi.org/simple"
 		exit 1
 	fi
 	build_wheels_from_sdists
