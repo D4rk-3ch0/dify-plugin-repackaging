@@ -118,7 +118,8 @@ repackage(){
 		echo "Syncing requirements.txt with pyproject.toml..."
 		# 删除旧的 uv.lock 避免锁定不存在的版本（如 greenlet==3.3.2）
 		rm -f uv.lock
-		uv pip compile pyproject.toml -o requirements.txt
+		# 使用 --resolution=lowest-direct 避免选择不存在的最新版本
+		uv pip compile pyproject.toml -o requirements.txt --resolution=lowest-direct
 	fi
 
 	download_setuptools
