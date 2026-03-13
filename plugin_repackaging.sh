@@ -116,7 +116,8 @@ repackage(){
 	# 用 uv 从 pyproject.toml 重新生成 requirements.txt（确保版本一致）
 	if [ -f "pyproject.toml" ]; then
 		echo "Syncing requirements.txt with pyproject.toml..."
-		uv pip compile pyproject.toml -o requirements.txt
+		# 使用 --resolution=lowest-direct 避免选择不存在的最新版本
+		uv pip compile pyproject.toml -o requirements.txt --resolution=lowest-direct
 	fi
 
 	download_setuptools
