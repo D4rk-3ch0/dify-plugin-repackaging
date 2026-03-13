@@ -112,96 +112,11 @@ repackage(){
 	cd ${CURR_DIR}/${PACKAGE_NAME}
 	sanitize_pyproject_for_runtime
 	mkdir -p ./wheels
-
-	# 确保已安装 uv
-	if ! command -v uv &> /dev/null; then
-		echo "Installing uv..."
-		curl -LsSf https://astral.sh/uv/install.sh | sh
-		export PATH="$HOME/.local/bin:$PATH"
-	fi
-
-	# 优先使用 Dify 已安装的虚拟环境导出包
-	if [ -d ".venv" ]; then
-		echo "Found existing uv venv (.venv), exporting installed packages..."
-		# 导出已安装的包列表
-		if [ -f ".venv/bin/pip" ]; then
-			.venv/bin/pip freeze > ./wheels/installed.txt
-		else
-			.venv/bin/python -m pip freeze > ./wheels/installed.txt
-		fi
-
-		# 使用导出的列表下载所有包
-		echo "Downloading packages from exported list..."
-		if [ -f ".venv/bin/pip" ]; then
-			.venv/bin/pip download -r ./wheels/installed.txt -d ./wheels \
-				--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
-		else
-			.venv/bin/python -m pip download -r ./wheels/installed.txt -d ./wheels \
-				--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
-		fi
-
-		if [[ $? -ne 0 ]]; then
-			echo "Failed to download packages."
-			exit 1
-		fi
-
-		# 清理临时文件
-		rm ./wheels/installed.txt
-	else
-		# 没有虚拟环境，按原来的方式处理
-		echo "No venv found, downloading from pyproject.toml..."
-
-		# 先用 uv 编译 requirements.txt 从 pyproject.toml
-		if [ -f "pyproject.toml" ]; then
-			echo "Compiling requirements.txt from pyproject.toml..."
-			uv pip compile pyproject.toml -o requirements.txt \
-				--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
-
-			if [[ $? -ne 0 ]]; then
-				echo "Failed to compile requirements from pyproject.toml."
-				exit 1
-			fi
-		fi
-
-		# 使用 pip 下载依赖
-		echo "Downloading dependencies..."
-		if [ -n "${PIP_PLATFORM}" ]; then
-			# 指定了平台：需要分两步处理（cross-platform 场景）
-			# 第一步：尝试下载指定平台的 wheel
-			echo "Step 1: Downloading binary wheels for platform: ${PIP_PLATFORM}..."
-			pip download ${PIP_PLATFORM} -r requirements.txt -d ./wheels \
-				--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com \
-				--only-binary=:all: 2>/dev/null
-
-			# 如果失败，第二步：临时清空平台参数，下载源码包
-			if [[ $? -ne 0 ]]; then
-				echo "Some packages don't have binary wheels. Step 2: Downloading source packages..."
-				# 临时保存并清空 PIP_PLATFORM
-				SAVED_PIP_PLATFORM="${PIP_PLATFORM}"
-				PIP_PLATFORM=""
-				pip download -r requirements.txt -d ./wheels \
-					--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
-				DOWNLOAD_STATUS=$?
-				PIP_PLATFORM="${SAVED_PIP_PLATFORM}"
-
-				if [[ ${DOWNLOAD_STATUS} -ne 0 ]]; then
-					echo "Failed to download dependencies."
-					echo "Possible causes:"
-					echo "  - Dependency constraints in requirements.txt cannot be satisfied"
-					echo "  - Network issue or mirror unreachable: ${PIP_MIRROR_URL}"
-					exit 1
-				fi
-			fi
-		else
-			# 没有指定平台，直接下载（Linux 原生环境）
-			pip download -r requirements.txt -d ./wheels \
-				--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
-
-			if [[ $? -ne 0 ]]; then
-				echo "Failed to download dependencies."
-				exit 1
-			fi
-		fi
+	download_setuptools
+	pip download ${PIP_PLATFORM} -r requirements.txt -d ./wheels --index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com --only-binary=:all:
+	if [[ $? -ne 0 ]]; then
+		echo "Pip download failed."
+		exit 1
 	fi
 	build_wheels_from_sdists
 	cleanup_wheels_non_whl
@@ -248,6 +163,15 @@ install_unzip(){
 			exit 1
 		fi
 	fi
+}
+
+download_setuptools(){
+    echo "Downloading setuptools..."
+	pip download ${PIP_PLATFORM} "setuptools>=40.8.0" -d ./wheels --index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com --only-binary=:all:
+    if [[ $? -ne 0 ]]; then
+        echo "Download setuptools failed."
+        exit 1
+    fi
 }
 
 sanitize_pyproject_for_runtime(){
