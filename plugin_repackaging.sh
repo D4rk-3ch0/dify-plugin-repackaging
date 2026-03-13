@@ -133,22 +133,27 @@ repackage(){
 	fi
 
 	# 使用 pip 下载依赖
-	# 分两步：先尝试下载对应平台的 wheel，失败后下载源码包
 	echo "Downloading dependencies..."
 	if [ -n "${PIP_PLATFORM}" ]; then
+		# 指定了平台：需要分两步处理（cross-platform 场景）
 		# 第一步：尝试下载指定平台的 wheel
 		echo "Step 1: Downloading binary wheels for platform: ${PIP_PLATFORM}..."
 		pip download ${PIP_PLATFORM} -r requirements.txt -d ./wheels \
 			--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com \
 			--only-binary=:all: 2>/dev/null
 
-		# 如果失败，第二步：下载源码包（不限制平台）
+		# 如果失败，第二步：临时清空平台参数，下载源码包
 		if [[ $? -ne 0 ]]; then
 			echo "Some packages don't have binary wheels. Step 2: Downloading source packages..."
+			# 临时保存并清空 PIP_PLATFORM
+			SAVED_PIP_PLATFORM="${PIP_PLATFORM}"
+			PIP_PLATFORM=""
 			pip download -r requirements.txt -d ./wheels \
 				--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
+			DOWNLOAD_STATUS=$?
+			PIP_PLATFORM="${SAVED_PIP_PLATFORM}"
 
-			if [[ $? -ne 0 ]]; then
+			if [[ ${DOWNLOAD_STATUS} -ne 0 ]]; then
 				echo "Failed to download dependencies."
 				echo "Possible causes:"
 				echo "  - Dependency constraints in requirements.txt cannot be satisfied"
@@ -157,7 +162,7 @@ repackage(){
 			fi
 		fi
 	else
-		# 没有指定平台，直接下载
+		# 没有指定平台，直接下载（Linux 原生环境）
 		pip download -r requirements.txt -d ./wheels \
 			--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
 
