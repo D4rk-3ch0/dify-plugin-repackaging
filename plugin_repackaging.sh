@@ -123,7 +123,7 @@ repackage(){
 	# 先用 uv 编译 requirements.txt 从 pyproject.toml
 	if [ -f "pyproject.toml" ]; then
 		echo "Compiling requirements.txt from pyproject.toml..."
-		uv pip compile pyproject.toml -o requirements.txt ${PIP_PLATFORM} \
+		uv pip compile pyproject.toml -o requirements.txt \
 			--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
 
 		if [[ $? -ne 0 ]]; then
