@@ -112,6 +112,13 @@ repackage(){
 	cd ${CURR_DIR}/${PACKAGE_NAME}
 	sanitize_pyproject_for_runtime
 	mkdir -p ./wheels
+
+	# 用 uv 从 pyproject.toml 重新生成 requirements.txt（确保版本一致）
+	if [ -f "pyproject.toml" ]; then
+		echo "Syncing requirements.txt with pyproject.toml..."
+		uv pip compile pyproject.toml -o requirements.txt
+	fi
+
 	download_setuptools
 	pip download ${PIP_PLATFORM} -r requirements.txt -d ./wheels --index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com --only-binary=:all:
 	if [[ $? -ne 0 ]]; then
