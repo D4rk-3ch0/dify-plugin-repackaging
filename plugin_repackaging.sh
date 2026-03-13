@@ -118,8 +118,14 @@ repackage(){
 		echo "Syncing requirements.txt with pyproject.toml..."
 		# 删除旧的 uv.lock 避免锁定不存在的版本（如 greenlet==3.3.2）
 		rm -f uv.lock
-		# 使用 --resolution=lowest-direct 避免选择不存在的最新版本
-		uv pip compile pyproject.toml -o requirements.txt --resolution=lowest-direct
+		# 添加 greenlet 版本约束（3.3.2 不存在于 PyPI，最高 3.2.5）
+		if grep -q "greenlet" pyproject.toml 2>/dev/null; then
+			: # greenlet 已在 dependencies 中，跳过
+		else
+			# 在 dependencies 中添加 greenlet 版本约束
+			sed -i 's/\(dependencies = \[\)/\1\n    "greenlet>=3.2.0,<3.3.0",/' pyproject.toml 2>/dev/null || true
+		fi
+		uv pip compile pyproject.toml -o requirements.txt
 	fi
 
 	download_setuptools
